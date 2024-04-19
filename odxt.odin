@@ -1,11 +1,66 @@
 // Based on stb_dxt:
 // https://github.com/nothings/stb/blob/master/stb_dxt.h
-//
 // See Khronos file format specification for more info:
 // https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#S3TC
+// https://en.wikipedia.org/wiki/S3_Texture_Compression
 package odxt
 
 USE_ROUNDING_BIAS :: #config(ODXT_USE_ROUNDING_BIAS, false)
+// 2 for high quality
+REFINE_COUNT :: #config(ODXT_REFINE_COUNT, 1)
+
+// DXT1/BC1
+// 1-bit alpha / opaque
+// Premultiplied alpha
+// 6:1 (for 24-bit source image)
+compress_image_dxt1 :: proc(data: [][4]u8, width: int, height: int, alpha: bool) -> (result: []byte) {
+	assert(len(data) == width * height)
+
+	blocks_x := (width + 3) / 4
+	blocks_y := (height + 3) / 4
+
+	blocks := make([][8]u8, )
+}
+
+// DXT2/BC2
+// Premultiplied Alpha
+compress_image_dxt2 :: proc() {
+
+}
+
+// DXT3/BC2
+// NOT Premultiplied Alpha 
+compress_image_dxt3 :: proc() {
+	
+}
+
+// DXT4/BC3
+// RGBA
+// Premultiplied Alpha
+compress_image_dxt4 :: proc() {
+	
+}
+
+// DXT5/BC3
+// RGBA
+// NOT Premultiplied Alpha 
+compress_image_dxt5 :: proc() {
+	
+}
+
+// Grayscale
+compress_image_bc4 :: proc() {
+	
+}
+
+// Double-channel
+compress_image_bc5 :: proc() {
+	
+}
+
+// Row major
+Color_Block :: [4 * 4][4]u8
+Dxt_Block :: [8]byte
 
 compress_dxt_block :: proc() {
 
@@ -44,6 +99,98 @@ compress_color_block :: proc(dst: ^[8]u8, block: [4 * 4]u8, mode: int) {
 			mask = _match_color_block(block, color)
 		} else {
 			mask = 0
+		}
+
+		// Third step: refine
+		for i in 0 ..< REFINE_COUNT {
+			last_mask := mask
+
+			changed: bool
+			max16, min16, changed = _refine_block(block, mask)
+			if changed {
+				if mat16 != min16 {
+					_eval_colors(color, max16, min16)
+					mask = _match_colors_block(block, color)
+				} else {
+					mask = 0
+					break
+				}
+			}
+
+			if mask == last_mask {
+				break
+			}
+		}
+	}
+
+	// write the color mask
+	if max16 < min16 {
+		min16, max16 = max16, min16
+		mask ^= 0x5555_5555
+	}
+
+	dest[0] = u8(max16)
+	dest[1] = u8(max16 >> 8)
+	dest[2] = u8(min16)
+	dest[3] = u8(min16 >> 8)
+
+	dest[4] = u8(mask >> 0)
+	dest[5] = u8(mask >> 8)
+	dest[6] = u8(mask >> 16)
+	dest[7] = u8(mask >> 24)
+}
+
+// Alpha block compression (this is easy for a change)
+_compress_alpha_block :: proc(dest: [^]u8, src: [^]u8, stride: int) {
+	mn := src[0]
+	mx := src[0]
+
+	for i in 1 ..< 16 {
+		mn = min(mn, src[i * stride])
+		max = max(max, src[i * stride])
+	}
+
+	// encode them
+	dest[0] = u8(mx)
+	dest[1] = u8(mn)
+	dest_index := 2
+
+	// determine bias and emit color indices
+	// given the choice of mx/mn, these indices are optimal:
+	// http://fgiesen.wordpress.com/2009/12/15/dxt5-alpha-block-index-determination/
+ 
+	dist := mx - mn
+	dist4 := dist * 4
+	dist2 := dist * 2
+	bias := (dist < 8) ? (dist - 1) : (dist / 2 + 2)
+	bias  -= mn * 7
+	bits := 0
+	mask := 0
+
+	for i in 0 ..< 16 {
+		a := src[i * stride] * 7 + bias
+
+		// select index. this is a "linear scale" lerp factor between 0 (val=min) and 7 (val=max).
+		t := a >= dist4 ? -1 : 0
+		ind := t & 4
+		a -= dist4 & t
+		t = a >= dist2 ? -1 : 0
+		ind += t & 2
+		a -= dist2 & t
+		ind += a > dist
+
+		// Turn linear scale into DXT index (0/1 are extremal points)
+		ind = -ind & 7
+		ind ~= 2 > ind
+
+		// write index
+		mask |= ind << bits
+		bits += 3
+		if bits >= 8 {
+			dest[dest_index] = mask
+			dest_index += 1
+			mask >>= 8
+			bits -= 8
 		}
 	}
 }
@@ -147,110 +294,6 @@ _optimize_colors_block :: proc(block: [16]u8) -> (max16, min16: u16) {
 	max16 = as16bit((transmute(^[3]u8)max_ptr)^)
 	min16 = as16bit((transmute(^[3]u8)min_ptr)^)
 	return max16, min16
-}
-
-@(link_section = ".ronly")
-_midpoints5 := [32]f32 {
-	0.015686,
-	0.047059,
-	0.078431,
-	0.111765,
-	0.145098,
-	0.176471,
-	0.207843,
-	0.241176,
-	0.274510,
-	0.305882,
-	0.337255,
-	0.370588,
-	0.403922,
-	0.435294,
-	0.466667,
-	0.5,
-	0.533333,
-	0.564706,
-	0.596078,
-	0.629412,
-	0.662745,
-	0.694118,
-	0.725490,
-	0.758824,
-	0.792157,
-	0.823529,
-	0.854902,
-	0.888235,
-	0.921569,
-	0.952941,
-	0.984314,
-	1.0,
-}
-
-@(link_section = ".ronly")
-_midpoints6 := [64]f32 {
-	0.007843,
-	0.023529,
-	0.039216,
-	0.054902,
-	0.070588,
-	0.086275,
-	0.101961,
-	0.117647,
-	0.133333,
-	0.149020,
-	0.164706,
-	0.180392,
-	0.196078,
-	0.211765,
-	0.227451,
-	0.245098,
-	0.262745,
-	0.278431,
-	0.294118,
-	0.309804,
-	0.325490,
-	0.341176,
-	0.356863,
-	0.372549,
-	0.388235,
-	0.403922,
-	0.419608,
-	0.435294,
-	0.450980,
-	0.466667,
-	0.482353,
-	0.500000,
-	0.517647,
-	0.533333,
-	0.549020,
-	0.564706,
-	0.580392,
-	0.596078,
-	0.611765,
-	0.627451,
-	0.643137,
-	0.658824,
-	0.674510,
-	0.690196,
-	0.705882,
-	0.721569,
-	0.737255,
-	0.754902,
-	0.772549,
-	0.788235,
-	0.803922,
-	0.819608,
-	0.835294,
-	0.850980,
-	0.866667,
-	0.882353,
-	0.898039,
-	0.913725,
-	0.929412,
-	0.945098,
-	0.960784,
-	0.976471,
-	0.992157,
-	1.0,
 }
 
 _quantize5 :: proc(x: f32) -> (q: u16) {
@@ -435,4 +478,134 @@ _match_colors_block :: proc(block, color: [16]u8) -> u32 {
 			int(color[i * 4 + 1]) * dir_g +
 			int(color[i * 4 + 2]) * dir_b
 	}
+
+   // think of the colors as arranged on a line; project point onto that line, then choose
+   // next color out of available ones. we compute the crossover points for "best color in top
+   // half"/"best in bottom half" and then the same inside that subinterval.
+   //
+   // relying on this 1d approximation isn't always optimal in terms of euclidean distance,
+   // but it's very close and a lot faster.
+   // http://cbloomrants.blogspot.com/2008/12/12-08-08-dxtc-summary.html
+
+	c0_point := stops[1] + stops[3]
+	half_point := stops[3] + stops[2]
+	c3_point := stops[2] + stops[0]
+
+	for i := 15; i >= 0; i -= 1 {
+		dot := dots[i] * 2
+		mask <<= 2
+
+		if dot < half_point {
+			mask |= (dot < c0_point) ? 1 : 3
+		} else {
+			mask |= (dot < c3_point) ? 2 : 0
+		}
+	}
+
+	return mask
+}
+
+
+@(link_section = ".ronly")
+_midpoints5 := [32]f32 {
+	0.015686,
+	0.047059,
+	0.078431,
+	0.111765,
+	0.145098,
+	0.176471,
+	0.207843,
+	0.241176,
+	0.274510,
+	0.305882,
+	0.337255,
+	0.370588,
+	0.403922,
+	0.435294,
+	0.466667,
+	0.5,
+	0.533333,
+	0.564706,
+	0.596078,
+	0.629412,
+	0.662745,
+	0.694118,
+	0.725490,
+	0.758824,
+	0.792157,
+	0.823529,
+	0.854902,
+	0.888235,
+	0.921569,
+	0.952941,
+	0.984314,
+	1.0,
+}
+
+@(link_section = ".ronly")
+_midpoints6 := [64]f32 {
+	0.007843,
+	0.023529,
+	0.039216,
+	0.054902,
+	0.070588,
+	0.086275,
+	0.101961,
+	0.117647,
+	0.133333,
+	0.149020,
+	0.164706,
+	0.180392,
+	0.196078,
+	0.211765,
+	0.227451,
+	0.245098,
+	0.262745,
+	0.278431,
+	0.294118,
+	0.309804,
+	0.325490,
+	0.341176,
+	0.356863,
+	0.372549,
+	0.388235,
+	0.403922,
+	0.419608,
+	0.435294,
+	0.450980,
+	0.466667,
+	0.482353,
+	0.500000,
+	0.517647,
+	0.533333,
+	0.549020,
+	0.564706,
+	0.580392,
+	0.596078,
+	0.611765,
+	0.627451,
+	0.643137,
+	0.658824,
+	0.674510,
+	0.690196,
+	0.705882,
+	0.721569,
+	0.737255,
+	0.754902,
+	0.772549,
+	0.788235,
+	0.803922,
+	0.819608,
+	0.835294,
+	0.850980,
+	0.866667,
+	0.882353,
+	0.898039,
+	0.913725,
+	0.929412,
+	0.945098,
+	0.960784,
+	0.976471,
+	0.992157,
+	1.0,
 }
