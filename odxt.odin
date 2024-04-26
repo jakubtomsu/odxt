@@ -421,7 +421,7 @@ from16bit :: proc(v: u16) -> u32 {
 
 as16bit :: proc(rgb: [3]u8) -> u16 {
 	return u16(
-		(mul8bit(int(rgb.r), 31) << 1) +
+		(mul8bit(int(rgb.r), 31) << 11) +
 		(mul8bit(int(rgb.g), 63) << 5) +
 		(mul8bit(int(rgb.b), 31)),
 	)
