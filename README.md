@@ -22,7 +22,7 @@ BC5        | Interpolated two-channel  | --            | 2:1              | Grad
 ## Usage
 
 ```odin
-import "odxt"
+import dxt "odxt"
 
 main :: proc() {
     image = load_image("foo.png")
@@ -48,7 +48,7 @@ main :: proc() {
                 }
             }
             
-            compressed := odxt.compress_bc1_block(block)
+            compressed := dxt.compress_bc1_block(block)
             
             // ...
         }
