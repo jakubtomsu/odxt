@@ -29,7 +29,6 @@ package odxt
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:fmt"
 
 // From stb_dxt docs:
 // use a rounding bias during color interpolation. this is closer to what "ideal"
