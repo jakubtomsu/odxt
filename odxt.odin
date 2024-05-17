@@ -55,7 +55,7 @@ compress_bc2_block :: proc(src: [16][4]u8, high_quality := false) -> (result: [2
 
     // Set the alpha to opaque, because code uses a fast test for color constancy
     for &d in src {
-        d[3] = 255
+        d.a = 255
     }
 
     result[1] = _compress_color_block(block = src, high_quality = high_quality)
@@ -72,7 +72,7 @@ compress_bc3_block :: proc(src: [16][4]u8, high_quality := false) -> (result: [2
 
     // Set the alpha to opaque, because code uses a fast test for color constancy
     for &d in src {
-        d[3] = 255
+        d.a = 255
     }
 
     result[1] = _compress_color_block(block = src, high_quality = high_quality)
@@ -170,7 +170,7 @@ _compress_color_block :: proc(block: [16][4]u8, high_quality: bool) -> [8]u8 {
 // Alpha block compression (this is easy for a change)
 _compress_alpha_block :: proc(src: [^]u8, stride: i32) -> (dst: [8]u8) {
     mn := i32(src[0])
-    mx := i32(src[0])
+    mx := mn
 
     for i in 1 ..< i32(16) {
         mn = min(mn, i32(src[i * stride]))
@@ -191,7 +191,7 @@ _compress_alpha_block :: proc(src: [^]u8, stride: i32) -> (dst: [8]u8) {
     dist2 := dist * 2
     bias := (dist < 8) ? (dist - 1) : (dist / 2 + 2)
     bias -= mn * 7
-    bits: uint = 0
+    bits: u32 = 0
     mask: i32 = 0
 
     for i in 0 ..< i32(16) {
@@ -201,10 +201,12 @@ _compress_alpha_block :: proc(src: [^]u8, stride: i32) -> (dst: [8]u8) {
         t: i32 = a >= dist4 ? -1 : 0
         ind := t & 4
         a -= dist4 & t
+
         t = a >= dist2 ? -1 : 0
         ind += t & 2
         a -= dist2 & t
-        ind += i32(a > dist)
+
+        ind += i32(a >= dist)
 
         // Turn linear scale into DXT index (0/1 are extremal points)
         ind = -ind & 7

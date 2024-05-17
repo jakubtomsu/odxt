@@ -47,15 +47,20 @@ main :: proc() {
 
                 // fmt.println("Block", bx, by)
 
-                res0, res1: [8]u8
-                res0 = dxt.compress_bc1_block(src = block, high_quality = high_qual)
+                res0, res1: [2][8]u8
+                res0 = dxt.compress_bc3_block(src = block, high_quality = high_qual)
 
-                stb_compress_dxt_block(cast([^]u8)&res1, cast([^]u8)&block, alpha = 0, mode = high_qual ? 2 : 0)
+                stb_compress_dxt_block(cast([^]u8)&res1, cast([^]u8)&block, alpha = 1, mode = high_qual ? 2 : 0)
 
                 // fmt.println(bx, by, res0, res1)
 
-                if res0 != res1 {
-                    fmt.println("  Incorrect", bx, by, res0, res1)
+                if res0[0] != res1[0] {
+                    fmt.println("  Incorrect 0", bx, by, res0[0], res1[0])
+                    // assert(false)
+                }
+
+                if res0[1] != res1[1] {
+                    fmt.println("  Incorrect 1", bx, by, res0[1], res1[1])
                     // assert(false)
                 }
             }
