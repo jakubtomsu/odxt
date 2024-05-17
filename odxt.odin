@@ -28,7 +28,6 @@ https://en.wikipedia.org/wiki/S3_Texture_Compression
 package odxt
 
 import "base:intrinsics"
-import "base:runtime"
 
 // From stb_dxt docs:
 // use a rounding bias during color interpolation. this is closer to what "ideal"
