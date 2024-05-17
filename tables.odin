@@ -1,6 +1,6 @@
 package odxt
 
-@(link_section=".rodata")
+@(link_section = RO_SECTION)
 _omatch5: [256][2]u8 = {
     {0, 0},
     {0, 0},
@@ -260,7 +260,7 @@ _omatch5: [256][2]u8 = {
     {31, 31},
 }
 
-@(link_section=".rodata")
+@(link_section = RO_SECTION)
 _omatch6: [256][2]u8 = {
     {0, 0},
     {0, 1},

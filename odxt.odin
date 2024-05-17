@@ -1,30 +1,35 @@
-// Based on stb_dxt:
-// https://github.com/nothings/stb/blob/master/stb_dxt.h
-// See Khronos file format specification for more info:
-// https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#S3TC
-// https://en.wikipedia.org/wiki/S3_Texture_Compression
+/*
+USAGE:
+call compress_bcN_block() for every block (you must pad)
+source should be a 4x4 block of RGBA data in row-major order;
+Alpha channel is not stored if you specify alpha=0 (but you
+must supply some constant alpha in the alpha channel).
+
+
+Format overview table:
+
+Name       Description                Premul Alpha   Compression       Texture type
+BC1/DXT1   1-bit alpha / opaque       Yes            6:1 (24bit src)   Simple non-alpha
+BC2/DXT2   Explicit alpha             Yes            4:1               Sharp alpha
+BC2/DXT3   Explicit alpha             No             4:1               Sharp alpha
+BC3/DXT4   Interpolated alpha         Yes            4:1               Gradient alpha
+BC3/DXT5   Interpolated alpha         No             4:1               Gradient alpha
+BC4        Interpolated greyscale     --             2:1               Gradient
+BC5        Interpolated two-channel   --             2:1               Gradient
+
+
+Based on stb_dxt:
+https://github.com/nothings/stb/blob/master/stb_dxt.h
+
+See Khronos file format specification for more info:
+https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#S3TC
+https://en.wikipedia.org/wiki/S3_Texture_Compression
+*/
 package odxt
 
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
-
-// USAGE:
-// call compress_bcN_block() for every block (you must pad)
-// source should be a 4x4 block of RGBA data in row-major order;
-// Alpha channel is not stored if you specify alpha=0 (but you
-// must supply some constant alpha in the alpha channel).
-
-// Format overview table:
-// 
-// Name       Description                Premul Alpha   Compression       Texture type
-// BC1/DXT1   1-bit alpha / opaque       Yes            6:1 (24bit src)   Simple non-alpha
-// BC2/DXT2   Explicit alpha             Yes            4:1               Sharp alpha
-// BC2/DXT3   Explicit alpha             No             4:1               Sharp alpha
-// BC3/DXT4   Interpolated alpha         Yes            4:1               Gradient alpha
-// BC3/DXT5   Interpolated alpha         No             4:1               Gradient alpha
-// BC4        Interpolated greyscale     --             2:1               Gradient
-// BC5        Interpolated two-channel   --             2:1               Gradient
 
 // From stb_dxt docs:
 // use a rounding bias during color interpolation. this is closer to what "ideal"
